@@ -1,0 +1,33 @@
+# Datasets — all auto-download on first run via torchvision.
+# MNIST and SVHN are fetched by kernel_tools/data.py; CIFAR-10 by
+# kernel_tools/scaling_data.py. ImageNet is NOT auto-downloaded and must be
+# supplied as an ImageFolder tree at $IMAGENET_ROOT (see README, Group 6).
+data/MNIST/
+data/SVHN/
+data/CIFAR10/
+data/cifar-10-batches-py/
+
+# Experiment artifacts. Regenerable from the scripts; individually large
+# (a Task-A audit artifact at n_successful=64 is ~2.7 GB, an exact IPS
+# matrix ~10 GB).
+data/**/*.pt
+data/**/*.pkl
+data/**/*.npz
+data/**/*.json
+data/*.pt
+data/*.pkl
+data/*.npz
+data/*.json
+
+# Regenerable outputs. Note 'figures/*' rather than 'figures/': git cannot
+# re-include a file inside an excluded directory, so the .gitkeep negation
+# only takes effect if the directory itself is not excluded.
+figures/*
+!figures/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/

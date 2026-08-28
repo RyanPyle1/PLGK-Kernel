@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper below."
+title: "Path-Integrated Loss-Gradient Kernels: reproduction code"
+license: MIT
+authors:
+  - family-names: "Pyle"
+    given-names: "Ryan"
+    email: "ryanpyle1@gmail.com"
+preferred-citation:
+  type: article
+  title: "Path-Integrated Loss-Gradient Kernels: Auditing and Similarity for Trained Neural Networks"
+  journal: "Transactions on Machine Learning Research"
+  year: 2026
+  issn: "2835-8856"
+  authors:
+    - family-names: "Pyle"
+      given-names: "Ryan"
+    - family-names: "Ju"
+      given-names: "Yilong"
+    - family-names: "Patel"
+      given-names: "Ankit"

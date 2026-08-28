@@ -1,0 +1,13 @@
+# Core dependencies for the CPU / single-GPU reference implementation
+# (main-text MNIST and SVHN experiments; Sections 5, 6; Appendix A.1-A.17).
+#
+# NOTE: numpy<2.4 is a torchvision-side compatibility constraint; when the
+# torchvision wheel on your platform is built against numpy 2.x this pin can
+# be relaxed.
+torch>=2.0,<3
+torchvision>=0.15,<1
+numpy>=1.24,<2.4
+matplotlib>=3.7
+scikit-learn>=1.3     # for UMAP-adjacent operations in IPS figures
+umap-learn>=0.5       # for IPS UMAP projections (Section 6.2, Figures 5-7)
+foolbox>=3.3          # adversarial attacks (FGSM, PGD, BIM, DeepFool) — Section 6.3
