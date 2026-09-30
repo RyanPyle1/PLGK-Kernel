@@ -72,9 +72,10 @@ def train_with_audit(
 
     Order per step:
 
-    1. Snapshot pre-step train gradients into the audit's rolling store
-       (before optimizer.step, so we know the pre-step model state gave rise
-       to the step being taken).
+    1. Snapshot pre-step train gradients (``audit.capture_train_gradients``,
+       before optimizer.step, so the audit uses the model state that gave
+       rise to the step being taken); ``audit.update`` pushes them into the
+       rolling store after the step.
     2. optimizer.step()
     3. Compute post-step audit gradients (NTKtest).
     4. Trapezoidal PNTK update.
@@ -165,6 +166,9 @@ def train_with_audit(
             predict_y = model(train_x.to(device).float())
             _error = loss_fn(predict_y, train_label.to(device).long())
             _error.backward(retain_graph=True)
+            if audit is not None:
+                # Train-side per-sample gradients at the PRE-step parameters.
+                audit.capture_train_gradients(train_x, train_label)
             optimizer.step()
 
             if audit is not None:

@@ -62,6 +62,7 @@ def run(accum_cls, *, device, steps, train_batches, batch_size, lr, seed,
         opt.zero_grad()
         loss = lf(model(x.to(device).float()), y.to(device).long())
         loss.backward()
+        acc.capture_train_gradients(x, y)
         opt.step()
         acc.update(train_x=x, train_label=y, idx=idx, audit_loader=audit_loader,
                    optimizer=opt, epoch=0, train_batches=train_batches,

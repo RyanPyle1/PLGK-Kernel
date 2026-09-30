@@ -105,6 +105,9 @@ def train_with_audit_gpu(
             predict_y = model(train_x.to(device).float())
             _error = loss_fn(predict_y, train_label.to(device).long())
             _error.backward()
+            if audit is not None:
+                # Train-side per-sample gradients at the PRE-step parameters.
+                audit.capture_train_gradients(train_x, train_label)
             optimizer.step()
 
             if audit is not None:
