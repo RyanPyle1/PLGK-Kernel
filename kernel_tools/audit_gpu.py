@@ -101,6 +101,11 @@ class GPUAuditAccumulator(AuditAccumulator):
                     y_target[s:e] = test_label
         return y_init, y_target
 
+    def capture_train_gradients(self, train_x: torch.Tensor, train_label: torch.Tensor) -> None:
+        """Device-resident counterpart of the parent's pre-step snapshot."""
+        with torch.no_grad():
+            self._pending_train_grads = self.per_sample_grads(train_x, train_label).to(self.device)
+
     def update(
         self,
         train_x: torch.Tensor,
@@ -123,7 +128,7 @@ class GPUAuditAccumulator(AuditAccumulator):
 
         # (1) Train-side gradients into the rolling store.
         with torch.no_grad():
-            NTKtrain = self.per_sample_grads(train_x, train_label).to(dev)
+            NTKtrain = self._take_train_grads(train_x, train_label).to(dev)
             if self.nahead > 0:
                 self.NTKtrain_store.mul_(0.9)
                 self.nahead_batch[self.nahead_counter] = idx

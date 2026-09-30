@@ -22,6 +22,7 @@ Adam-momentum tracking described in Appendix A.2.6.
 """
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -69,6 +70,8 @@ class AuditAccumulator:
     NTKtrain_store: torch.Tensor = field(init=False)
     nahead_batch: torch.Tensor = field(init=False)
     nahead_counter: int = 0
+    _pending_train_grads: Any = field(init=False, default=None)
+    _warned_post_step: bool = field(init=False, default=False)
     _fmodel: Any = field(init=False, default=None)
     _params: Any = field(init=False, default=None)
     _buffers: Any = field(init=False, default=None)
@@ -149,6 +152,36 @@ class AuditAccumulator:
                     y_target[s:e] = test_label
         return y_init, y_target
 
+    def capture_train_gradients(self, train_x: torch.Tensor, train_label: torch.Tensor) -> None:
+        """Snapshot train-side per-sample gradients at the PRE-step parameters.
+
+        Call after ``loss.backward()`` and BEFORE ``optimizer.step()``; the
+        next ``update()`` consumes the snapshot. The optimizer step at t is
+        built from gradients at theta_t, so the audit must use gradients at
+        theta_t as well (as the paper's original notebook does). Evaluating
+        them after the step, at theta_{t+1}, biases the audit: on the paper's
+        MNIST run it over-predicts late-training loss changes by ~6-8% and
+        raises the 50-epoch MRE from ~0.0105 to ~0.05.
+        """
+        with torch.no_grad():
+            self._pending_train_grads = self.per_sample_grads(train_x, train_label).cpu()
+
+    def _take_train_grads(self, train_x: torch.Tensor, train_label: torch.Tensor) -> torch.Tensor:
+        """Return the pre-step snapshot if one was captured; otherwise fall
+        back to post-step gradients (legacy behaviour) with a one-time warning."""
+        if self._pending_train_grads is not None:
+            g = self._pending_train_grads
+            self._pending_train_grads = None
+            return g
+        if not self._warned_post_step:
+            warnings.warn(
+                "AuditAccumulator.update(): no pre-step train gradients were captured, so they are "
+                "evaluated AFTER optimizer.step() (theta_{t+1}). This biases the audit (paper MNIST "
+                "run: MRE ~0.05 instead of ~0.0105). Call capture_train_gradients(train_x, "
+                "train_label) before optimizer.step().", RuntimeWarning, stacklevel=3)
+            self._warned_post_step = True
+        return self.per_sample_grads(train_x, train_label)
+
     def update(
         self,
         train_x: torch.Tensor,
@@ -165,7 +198,9 @@ class AuditAccumulator:
         Assumes the caller has just done a training step. The order of ops
         is:
 
-        1. Snapshot pre-step train gradients (used with rolling store).
+        1. Train gradients at the pre-step parameters, captured by
+           ``capture_train_gradients()`` before ``optimizer.step()`` and
+           pushed into the rolling store here.
         2. optimizer.step() has already run.
         3. Compute post-step audit gradients (``NTKtest``).
         4. Back out effective per-param LR from Adam state.
@@ -174,12 +209,13 @@ class AuditAccumulator:
         Only Adam is supported for the effective-LR back-out. For SGD, pass
         the raw lr; effective and nominal lr coincide.
         """
-        # (1) Snapshot train gradients (pre-step model state is what we want,
-        #     but the caller has already stepped -- we accept this because the
-        #     audit uses trapezoidal averaging across steps anyway; net error
-        #     is O(lr^3) per step, negligible at Adam's lr=1.5e-5 scale).
+        # (1) Train gradients at the PRE-step parameters theta_t (captured by
+        #     capture_train_gradients before optimizer.step). Gradients taken
+        #     after the step are NOT a negligible approximation under Adam:
+        #     late in training the audit then over-predicts per-epoch loss
+        #     changes by ~6-8% (MNIST paper run: MRE 0.05 vs 0.0105).
         with torch.no_grad():
-            NTKtrain = self.per_sample_grads(train_x, train_label).cpu()
+            NTKtrain = self._take_train_grads(train_x, train_label).cpu()
             if self.nahead > 0:
                 # rolling exponentially-decayed store of recent train gradients
                 self.NTKtrain_store.mul_(0.9)
